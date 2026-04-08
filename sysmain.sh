@@ -115,7 +115,7 @@ $do_print_today && print_todays_updates
 if ! $do_backups && ! $do_checkupdate && ! $do_package_list_files && ! $do_print_today; then
     echo "Usage: $0 [-c] [-b] [-l]"
     echo " -c   Check for updates"
-    echo " -b   Run backups"
+    echo " -b   Create backups of current cached pkgs"
     echo " -l   Create lists of updated packages from pacman.log"
     echo " -p   Print packages updated today"
 fi
