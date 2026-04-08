@@ -43,6 +43,7 @@ print_todays_updates() {
     echo "--------------------------------------------------------"
 }
 
+# create lists of packages installed from monday of this current week
 create_pacman_lists() {
     local currentdate="$(date +"%Y-%m-%d")"
     # Convert start and end dates to timestamps
@@ -58,6 +59,18 @@ create_pacman_lists() {
     echo "...done."
     rg -F -f <(pacman -Qe) "$OUTPUT_FILE" > "$ELST_FILE"
     echo ">>|Explicitly installed now list save to $ELST_FILE"
+}
+
+# create backups of the cached updated pkgs
+create_backups() {
+    local src="/var/cache/pacman/pkg"
+    local dst="$HOME/Documents/"
+    local files=("$src"/*)
+    if (( ${#files[@]} )); then
+        mv -- "${files[@]}" "$dst"/
+    else
+        echo "No files to move in $src"
+    fi
 }
 
 # MAIN script starts here:
@@ -82,6 +95,7 @@ done
 $do_checkupdate && check_for_updates
 $do_package_list_files && create_pacman_lists
 $do_print_today && print_todays_updates
+#$do_backups && create_backups
 
 # If no flags provided, show usage
 if ! $do_backups && ! $do_checkupdate && ! $do_package_list_files && ! $do_print_today; then
