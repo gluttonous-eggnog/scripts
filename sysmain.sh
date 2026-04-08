@@ -6,14 +6,16 @@ OUTPUT_FILE="$HOME/Documents/all_pkg.txt"
 
 # Check for updates and additionally see if any affect AMD GPU
 check_for_updates() {
-    echo "Checking for updates..."
     local count=$(checkupdates | wc -l)
+
+    echo "Checking for updates..."
     if [ "$count" -ne 0 ]; then
         echo "Updates available: $count"
         # detect AMD GPU related packages
-        local test=$(checkupdates)
-        local amdgpu_detect="$(echo $test | awk '/mesa|vulkan|amd|radeon|rocm|amdgpu|firmware|drm|xf86-video-amdgpu/ {print $3, $4}')"
-        if [ -z "$amdgpu_detect" ]; then
+        local test amdgpu_detect
+        test=$(checkupdates)
+        amdgpu_detect="$(echo $test | awk '/mesa|vulkan|amd|radeon|rocm|amdgpu|firmware|drm|xf86-video-amdgpu/ {print $3, $4}')"
+        if [ -z "${amdgpu_detect-}" ]; then
             echo "No AMD GPU related packages found"
         else
             echo "!!! FOUND THESE PACKAGES !!!"
@@ -27,6 +29,7 @@ check_for_updates() {
 # Get the most recent Monday (today if it's Monday)
 get_monday() {
     local monday
+
     if [[ $(date +%u) -eq 1 ]]; then
         monday="$(date +"%Y-%m-%d")"
     else
@@ -37,18 +40,27 @@ get_monday() {
 
 # print a list of pkgs updated today (today's current date)
 print_todays_updates() {
-    local currentdate="$(date +"%Y-%m-%d")"
-    echo "--------------------------------------------------------"
-    awk "/$currentdate.*upgraded/{print \$4, \$5, \$6, \$7}" /var/log/pacman.log
-    echo "--------------------------------------------------------"
+    local currentdate test
+
+    currentdate="$(date +"%Y-%m-%d")"
+    test =$(awk "/$currentdate.*upgraded/{print \$4, \$5, \$6, \$7}" /var/log/pacman.log)
+    if [ -n "${test-}" ]; then
+        echo "--------------------------------------------------------"
+        echo "$test"
+        echo "--------------------------------------------------------"
+    else
+        echo "Nothing to see here."
+    fi
 }
 
 # create lists of packages installed from monday of this current week
 create_pacman_lists() {
-    local currentdate="$(date +"%Y-%m-%d")"
+    local currentdate monday ENDD
+
+    currentdate="$(date +"%Y-%m-%d")"
     # Convert start and end dates to timestamps
-    local monday="$(get_monday)"
-    local ENDD="$(date -d "$currentdate +1 day" +'%Y-%m-%d')"
+    monday="$(get_monday)"
+    ENDD="$(date -d "$currentdate +1 day" +'%Y-%m-%d')"
     echo ">> GET A LIST OF UPGRADED PKGS SINCE: $monday"
     # Query packages installed and save to file
     echo "Querying packages installed since $monday"
@@ -63,9 +75,11 @@ create_pacman_lists() {
 
 # create backups of the cached updated pkgs
 create_backups() {
-    local src="/var/cache/pacman/pkg"
-    local dst="$HOME/Documents/"
-    local files=("$src"/*)
+    local src dst files
+
+    src="/var/cache/pacman/pkg"
+    dst="$HOME/Documents/"
+    files=("$src"/*)
     if (( ${#files[@]} )); then
         mv -- "${files[@]}" "$dst"/
     else
