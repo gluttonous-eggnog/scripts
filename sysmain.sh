@@ -43,7 +43,7 @@ print_todays_updates() {
     local currentdate test
 
     currentdate="$(date +"%Y-%m-%d")"
-    test =$(awk "/$currentdate.*upgraded/{print \$4, \$5, \$6, \$7}" /var/log/pacman.log)
+    test=$(awk "/$currentdate.*upgraded/{print \$4, \$5, \$6, \$7}" /var/log/pacman.log)
     if [ -n "${test-}" ]; then
         echo "--------------------------------------------------------"
         echo "$test"
