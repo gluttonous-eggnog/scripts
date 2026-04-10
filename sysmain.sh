@@ -38,7 +38,7 @@ get_monday() {
     echo "$monday"
 }
 
-# print a list of pkgs updated today (today's current date)
+# Print a list of pkgs updated today (today's current date)
 print_todays_updates() {
     local currentdate test
 
@@ -53,7 +53,7 @@ print_todays_updates() {
     fi
 }
 
-# create lists of packages installed from monday of this current week
+# Create lists of packages installed from monday of this current week
 create_pacman_lists() {
     local currentdate monday ENDD
 
@@ -73,7 +73,7 @@ create_pacman_lists() {
     echo ">>|Explicitly installed now list save to $ELST_FILE"
 }
 
-# create backups of the cached updated pkgs
+# Create backups of the cached updated pkgs
 create_backups() {
     local src dst files
 
@@ -88,34 +88,36 @@ create_backups() {
 }
 
 # MAIN script starts here:
-do_checkupdate=false
-do_backups=false
-do_package_list_files=false
-do_print_today=false
+main() {
+    do_checkupdate=false
+    do_backups=false
+    do_package_list_files=false
+    do_print_today=false
 
 
-# Parse options
-while getopts ":cblp" opt; do
-    case $opt in
-        c) do_checkupdate=true ;;
-        b) do_backups=true ;;
-        l) do_package_list_files=true ;;
-        p) do_print_today=true ;;
-        \?) echo "Invalid option: -$OPTARG" >&2; exit 1 ;;
-    esac
-done
+    # Parse options
+    while getopts ":cblp" opt; do
+        case $opt in
+            c) do_checkupdate=true ;;
+            b) do_backups=true ;;
+            l) do_package_list_files=true ;;
+            p) do_print_today=true ;;
+            \?) echo "Invalid option: -$OPTARG" >&2; exit 1 ;;
+        esac
+    done
 
-# Execute requested options
-$do_checkupdate && check_for_updates
-$do_package_list_files && create_pacman_lists
-$do_print_today && print_todays_updates
-#$do_backups && create_backups
+    # Execute requested options
+    $do_checkupdate && check_for_updates
+    $do_package_list_files && create_pacman_lists
+    $do_print_today && print_todays_updates
 
-# If no flags provided, show usage
-if ! $do_backups && ! $do_checkupdate && ! $do_package_list_files && ! $do_print_today; then
-    echo "Usage: $0 [-c] [-b] [-l]"
-    echo " -c   Check for updates"
-    echo " -b   Create backups of current cached pkgs"
-    echo " -l   Create lists of updated packages from pacman.log"
-    echo " -p   Print packages updated today"
-fi
+    # If no flags provided, show usage
+    if ! $do_backups && ! $do_checkupdate && ! $do_package_list_files && ! $do_print_today; then
+        echo "Usage: $0 [-c] [-b] [-l]"
+        echo " -c   Check for updates"
+        echo " -b   Backup current cached pkgs"
+        echo " -l   Create lists of updated packages from pacman.log"
+        echo " -p   Print packages updated today"
+    fi
+}
+main "$@"
