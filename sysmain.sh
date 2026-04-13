@@ -13,7 +13,7 @@ check_for_updates() {
     if [ "$count" -ne 0 ]; then
         echo "Updates available: $count"
     else
-        echo "No new packages. You're up-to-date!"
+        echo "No new packages. System is up-to-date!"
     fi
 }
 
