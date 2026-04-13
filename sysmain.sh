@@ -6,21 +6,12 @@ OUTPUT_FILE="$HOME/Documents/all_pkg.txt"
 
 # Check for updates and additionally see if any affect AMD GPU
 check_for_updates() {
+    echo "Checking for updates..."
+
     local count=$(checkupdates | wc -l)
 
-    echo "Checking for updates..."
     if [ "$count" -ne 0 ]; then
         echo "Updates available: $count"
-        # detect AMD GPU related packages
-        local test amdgpu_detect
-        test=$(checkupdates)
-        amdgpu_detect="$(echo $test | awk '/mesa|vulkan|amd|radeon|rocm|amdgpu|firmware|drm|xf86-video-amdgpu/ {print $3, $4}')"
-        if [ -z "${amdgpu_detect-}" ]; then
-            echo "No AMD GPU related packages found"
-        else
-            echo "!!! FOUND THESE PACKAGES !!!"
-            echo "$amdgpu_detect"
-        fi
     else
         echo "No new packages. You're up-to-date!"
     fi
@@ -38,7 +29,7 @@ get_monday() {
     echo "$monday"
 }
 
-# Print a list of pkgs updated today (today's current date)
+# print a list of pkgs updated today (today's current date)
 print_todays_updates() {
     local currentdate test
 
@@ -49,11 +40,12 @@ print_todays_updates() {
         echo "$test"
         echo "--------------------------------------------------------"
     else
-        echo "Nothing to see here."
+        echo "Total Installed Pacakges      $(pacman -Q | wc -l)"
+        echo "Explicitly Installed Packages $(pacman -Qe | wc -l)"
     fi
 }
 
-# Create lists of packages installed from monday of this current week
+# create lists of packages installed from monday of this current week
 create_pacman_lists() {
     local currentdate monday ENDD
 
@@ -73,7 +65,7 @@ create_pacman_lists() {
     echo ">>|Explicitly installed now list save to $ELST_FILE"
 }
 
-# Create backups of the cached updated pkgs
+# create backups of the cached updated pkgs
 create_backups() {
     local src dst files
 
@@ -94,7 +86,6 @@ main() {
     do_package_list_files=false
     do_print_today=false
 
-
     # Parse options
     while getopts ":cblp" opt; do
         case $opt in
@@ -113,7 +104,7 @@ main() {
 
     # If no flags provided, show usage
     if ! $do_backups && ! $do_checkupdate && ! $do_package_list_files && ! $do_print_today; then
-        echo "Usage: $0 [-c] [-b] [-l]"
+        echo "Usage: $0 [-c] [-b] [-l] [-p]"
         echo " -c   Check for updates"
         echo " -b   Backup current cached pkgs"
         echo " -l   Create lists of updated packages from pacman.log"
