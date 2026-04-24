@@ -3,6 +3,7 @@ set -euo pipefail
 
 PKG_CSV="$HOME/Documents/pacmanpkgs.csv"
 
+# FUNCTION: check_for_updates()
 # Check for updates and additionally see if any affect AMD GPU
 check_for_updates() {
     echo "Checking for updates..."
@@ -10,14 +11,11 @@ check_for_updates() {
     local count=$(checkupdates | wc -l)
 
     if [ "$count" -ne 0 ]; then
+        local gpu_detect
+
         echo "Updates available: $count"
-        # detect AMD GPU related packages
-        local test amdgpu_detect
-        test=$(checkupdates)
-        gpu_detect="$(echo "$test" | awk '/cachyos|proton|wine|xorg|wayland|archlinux|faugus|steam|vulkan|firmware|drm/ {print $1, $4}')"
-        if [ -z "${amdgpu_detect-}" ]; then
-            echo "Nothing major"
-        else
+        gpu_detect="$(checkupdates | awk '/cachyos|proton|nvidia|amd|wine|xorg|wayland|archlinux|faugus|steam|vulkan|firmware|drm/ {print $1, $4}')"
+        if [ -n "${gpu_detect-}" ]; then
             echo "!!! FOUND THESE PACKAGES !!!"
             echo "$gpu_detect"
         fi
@@ -26,9 +24,10 @@ check_for_updates() {
     fi
 }
 
+# FUNCTION: update_the_csv()
 # Update the maintained package csv
 update_the_csv() {
-    local currentdate test package version_info old_version new_version timestamp
+    local currentdate testing package version_info old_version new_version timestamp
     local temp_file="${PKG_CSV}.tmp"
 
     currentdate="$(date +"%Y-%m-%d")"
@@ -36,11 +35,9 @@ update_the_csv() {
     # Extract today's upgrades from pacman.log
     # example output: [2026-04-22T15:40:17+1000] proton-cachyos-slr (1:10.0.20260408-1 -> 1:10.0.20260409-1)
     #                 $1                         $2                 $3                 $4 $5
-    test=$(awk "/$currentdate.*upgraded/{print \$1, \$4, \$5, \$6, \$7}" /var/log/pacman.log)
+    testing=$(awk "/$currentdate.*upgraded/{print \$1, \$4, \$5, \$6, \$7}" /var/log/pacman.log)
 
-    if [ -n "${test-}" ]; then
-        # Create temporary file starting with the header
-        # head -n 1 "$PKG_CSV" > "$temp_file"
+    if [ -n "${testing-}" ]; then
 
         # Process each upgraded package from today
         while IFS= read -r log_line; do
@@ -59,11 +56,10 @@ update_the_csv() {
             awk -v pkg="$package" -v new_v="$new_version" -v old_v="$old_version" -v ts="$timestamp" \
               '$0 ~ "^" pkg "," { $0 = pkg "," new_v "," old_v "," ts } 1' "$PKG_CSV" > "$PKG_CSV.tmp" && \
               mv "$PKG_CSV.tmp" "$PKG_CSV"
-            
-
-        done <<< "$test"
+        done <<< "$testing"
 
         echo "CSV file updated with today's package upgrades."
+        echo "to view, use 'cat Documents/pacmanpkgs.csv | column -s, -t | less'"
     else
         echo "Nothing was updated today."
     fi
@@ -71,6 +67,7 @@ update_the_csv() {
     echo "Explicitly installed packages   $(pacman -Qe | wc -l)"
 }
 
+# FUNCTION: sync_all_packages()
 # Update the maintained pacakges csv for newly installed packages
 sync_all_packages() {
     local temp_file="${PKG_CSV}.tmp"
@@ -95,19 +92,15 @@ sync_all_packages() {
     echo "CSV synced with all installed packages."
 }
 
+# FUNCTION: print_todays_updates()
 # print a list of pkgs updated today (today's current date)
 print_todays_updates() {
-    local currentdate test
-
-    currentdate="$(date +"%Y-%m-%d")"
-    test=$(awk "/$currentdate.*upgraded/{print \$4, \$5, \$6, \$7}" /var/log/pacman.log)
-    if [ -n "${test-}" ]; then
-        echo "--------------------------------------------------------"
-        echo "$test"
-        echo "--------------------------------------------------------"
-    fi
+    echo "----------------------------------------------------------------------------------------------"
+    grep "$(date +"%Y-%m-%d")" $PKG_CSV | column -s, -t
+    echo "----------------------------------------------------------------------------------------------"
 }
 
+# FUNCTION: create_backups()
 # Create a backup of cached packages if required
 create_backups() {
     local src dst files
