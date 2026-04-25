@@ -4,7 +4,7 @@ set -euo pipefail
 PKG_CSV="$HOME/Documents/pacmanpkgs.csv"
 
 # FUNCTION: check_for_updates()
-# Check for updates and additionally see if any affect AMD GPU
+# Check for updates and additionally see if any affect GPU
 check_for_updates() {
     echo "Checking for updates..."
 
@@ -28,7 +28,6 @@ check_for_updates() {
 # Update the maintained package csv
 update_the_csv() {
     local currentdate testing package version_info old_version new_version timestamp
-    local temp_file="${PKG_CSV}.tmp"
 
     currentdate="$(date +"%Y-%m-%d")"
 
@@ -58,7 +57,7 @@ update_the_csv() {
               mv "$PKG_CSV.tmp" "$PKG_CSV"
         done <<< "$testing"
 
-        echo "CSV file updated with today's package upgrades."
+        echo "$PKG_CSV updated with todays upgrades."
         echo "to view, use 'cat Documents/pacmanpkgs.csv | column -s, -t | less'"
     else
         echo "Nothing was updated today."
@@ -70,34 +69,43 @@ update_the_csv() {
 # FUNCTION: sync_all_packages()
 # Update the maintained pacakges csv for newly installed packages
 sync_all_packages() {
-    local temp_file="${PKG_CSV}.tmp"
+    if [ -f "$PKG_CSV" ]; then
+        local temp_file="${PKG_CSV}.tmp"
 
-    # Create new CSV with header
-    echo "package_name,current_version,prev_version,last_updated" > "$temp_file"
+        # Create new CSV with header
+        echo "package_name,current_version,prev_version,last_updated" > "$temp_file"
 
-    # Get all installed packages with their versions
-    pacman -Q | while read -r package version; do
-        # Check if package already exists in CSV
-        if grep -q "^${package}," "$PKG_CSV"; then
-            # Keep existing entry
-            grep "^${package}," "$PKG_CSV" >> "$temp_file"
-        else
-            # Add new package with today's date
-            echo "${package},${version},,unknown" >> "$temp_file"
-        fi
-    done
+        # Get all installed packages with their versions
+        pacman -Q | while read -r package version; do
+            # Check if package already exists in CSV
+            if grep -q "^${package}," "$PKG_CSV"; then
+                # Keep existing entry
+                grep "^${package}," "$PKG_CSV" >> "$temp_file"
+            else
+                # Add new package with today's date
+                echo "${package},${version},,unknown" >> "$temp_file"
+            fi
+        done
 
-    mv "$PKG_CSV" "${PKG_CSV}.bak"
-    mv "$temp_file" "$PKG_CSV"
-    echo "CSV synced with all installed packages."
+        mv "$PKG_CSV" "${PKG_CSV}.bak"
+        mv "$temp_file" "$PKG_CSV"
+        echo "$PKG_CSV was synced with all installed packages."
+    else
+        echo "Create $PKG_CSV and add:"
+        echo "'package_name,current_version,prev_version,last_updated'"
+        echo "Save file, then re-run this script."
+    fi
 }
 
 # FUNCTION: print_todays_updates()
 # print a list of pkgs updated today (today's current date)
 print_todays_updates() {
-    echo "----------------------------------------------------------------------------------------------"
-    grep "$(date +"%Y-%m-%d")" $PKG_CSV | column -s, -t
-    echo "----------------------------------------------------------------------------------------------"
+    local testing=$(grep "$(date +"%Y-%m-%d")" $PKG_CSV | column -s, -t)
+    if [ -n "${testing-}" ]; then
+        echo "----------------------------------------------------------------------------------------------------------------"
+        echo "$testing"
+        echo "----------------------------------------------------------------------------------------------------------------"
+    fi
 }
 
 # FUNCTION: create_backups()
