@@ -71,7 +71,7 @@ update_the_csv() {
 sync_all_packages() {
     if [ -f "$PKG_CSV" ]; then
         local temp_file="${PKG_CSV}.tmp"
-
+        
         # Create new CSV with header
         echo "package_name,current_version,prev_version,last_updated" > "$temp_file"
 
@@ -82,8 +82,10 @@ sync_all_packages() {
                 # Keep existing entry
                 grep "^${package}," "$PKG_CSV" >> "$temp_file"
             else
-                # Add new package with today's date
-                echo "${package},${version},,unknown" >> "$temp_file"
+                # Assuming package was only ever installed and not updated recently
+                # Get the install date (use 2>/dev/null to suppress error output if not found)
+                install_date=$(date -d "$(stat -c "%y" "/var/lib/pacman/local/${package}"-* 2>/dev/null | sed 's/.*: //')" "+%Y-%m-%d %H:%M:%S")
+                echo "${package},${version},,${install_date}" >> "$temp_file"
             fi
         done
 
