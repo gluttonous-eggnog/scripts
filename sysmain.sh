@@ -62,8 +62,6 @@ update_the_csv() {
     else
         echo "Nothing was updated today."
     fi
-    echo "Total installed packages        $(pacman -Q | wc -l)"
-    echo "Explicitly installed packages   $(pacman -Qe | wc -l)"
 }
 
 # FUNCTION: sync_all_packages()
@@ -89,9 +87,10 @@ sync_all_packages() {
             fi
         done
 
-        mv "$PKG_CSV" "${PKG_CSV}.bak"
-        mv "$temp_file" "$PKG_CSV"
-        echo "$PKG_CSV was synced with all installed packages."
+        # Create a backup of original CSV file
+        mv "$PKG_CSV" "${PKG_CSV}.bak" && echo "$PKG_CSV backup created."
+        # make this the new official CSV file
+        mv "$temp_file" "$PKG_CSV" && echo "$PKG_CSV synced with all installed packages."
     else
         echo "Create $PKG_CSV and add:"
         echo "'package_name,current_version,prev_version,last_updated'"
@@ -108,6 +107,12 @@ print_todays_updates() {
         echo "$testing"
         echo "----------------------------------------------------------------------------------------------------------------"
     fi
+
+    local explicit=$(pacman -Qqe | wc -l)
+    local nativenondep=$(pacman -Qent | wc -l)
+    diff=$(( explicit - nativenondep ))
+    echo "$(pacman -Qq | wc -l) packages installed"
+    printf "%4s packages are explicitly (%s are dependencies)\n" $explicit $diff
 }
 
 # FUNCTION: create_backups()
@@ -126,7 +131,8 @@ create_backups() {
 }
 
 
-# MAIN script starts here:
+# MAIN
+# script starts here:
 main() {
     do_checkupdate=false
     do_backups=false
