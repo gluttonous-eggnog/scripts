@@ -101,18 +101,20 @@ sync_all_packages() {
 # FUNCTION: print_todays_updates()
 # print a list of pkgs updated today (today's current date)
 print_todays_updates() {
-    local testing=$(grep "$(date +"%Y-%m-%d")" $PKG_CSV | column -s, -t)
+    local explicit nativenondep diff testing
+
+    testing=$(grep "$(date +"%Y-%m-%d")" $PKG_CSV | column -s, -t)
     if [ -n "${testing-}" ]; then
         echo "----------------------------------------------------------------------------------------------------------------"
         echo "$testing"
         echo "----------------------------------------------------------------------------------------------------------------"
     fi
 
-    local explicit=$(pacman -Qqe | wc -l)
-    local nativenondep=$(pacman -Qent | wc -l)
+    explicit=$(pacman -Qqe | wc -l)
+    nativenondep=$(pacman -Qqent | wc -l)
     diff=$(( explicit - nativenondep ))
     echo "$(pacman -Qq | wc -l) packages installed"
-    printf "%4s packages are explicitly (%s are dependencies)\n" $explicit $diff
+    printf "%4s packages explicitly installed (of which %s are dependencies)\n" $explicit $diff
 }
 
 # FUNCTION: create_backups()
@@ -130,6 +132,24 @@ create_backups() {
     fi
 }
 
+# FUNCTION: status_check_mirrors()
+# check the status of the CachyOS mirrors and output out-of-sync
+status_check_mirrors() {
+    local mirrorsURL statusCheck
+
+    mirrorsURL="https://packages.cachyos.org/mirrors"
+    echo "Checking status of all mirrors from $mirrorsURL"
+    # perl -0777 makes <> whole doco as single string; -ne wraps code in while loop
+    # $1 = name | $2 = overallStatus | $3 = url
+    statusCheck=$(curl -sS "$mirrorsURL" | perl -0777 -ne 'while(/name:"([^"]+)",overallStatus:"(error|partial)",url:"([^"]+)"/g){ print "$2\t\t$3\n" }')
+    if [ -n "${statusCheck-}" ]; then
+        echo "_STATUS__________MIRROR____________________________________________________________________________"
+        echo "$statusCheck"
+    else
+        echo "All mirrors look healthy."
+    fi
+}
+
 
 # MAIN
 # script starts here:
@@ -139,13 +159,15 @@ main() {
     do_upgraded_packages=false
     do_installed_packages=false
     do_print_todays=false
+    do_mirror_check=false
 
     # Parse options
-    while getopts ":cbpsu" opt; do
+    while getopts ":cbmpsu" opt; do
         case $opt in
             c) do_checkupdate=true ;;
             b) do_backups=true ;;
-            p) do_print_todays=true;;
+            m) do_mirror_check=true ;;
+            p) do_print_todays=true ;;
             s) do_installed_packages=true ;;
             u) do_upgraded_packages=true ;;
             \?) echo "Invalid option: -$OPTARG" >&2; exit 1 ;;
@@ -157,12 +179,14 @@ main() {
     $do_installed_packages && sync_all_packages
     $do_upgraded_packages && update_the_csv
     $do_print_todays && print_todays_updates
+    $do_mirror_check && status_check_mirrors
 
     # If no flags provided, show usage
-    if ! $do_backups && ! $do_checkupdate && ! $do_installed_packages && ! $do_upgraded_packages && ! $do_print_todays; then
-        echo "Usage: $0 [-c] [-b] [-s] [-u]"
+    if ! $do_backups && ! $do_checkupdate && ! $do_installed_packages && ! $do_upgraded_packages && ! $do_print_todays && ! $do_mirror_check; then
+        echo "Usage: $0 [-c] [-b] [-m] [-s] [-u]"
         echo " -c   Check for updates"
         echo " -b   Backup current cached pkgs"
+        echo " -m   Check status of CachyOS mirrors"
         echo " -p   Print a list of upgraded packages from today"
         echo " -s   Sync the CSV file for newly installed"
         echo " -u   Update the maintained system package list CSV file"
