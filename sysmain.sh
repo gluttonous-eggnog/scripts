@@ -103,7 +103,7 @@ sync_all_packages() {
 print_todays_updates() {
     local explicit nativenondep diff testing
 
-    testing=$(grep "$(date +"%Y-%m-%d")" $PKG_CSV | column -s, -t)
+    testing=$( (grep "$(date +"%Y-%m-%d")" $PKG_CSV | column -s, -t) || true )
     if [ -n "${testing-}" ]; then
         echo "----------------------------------------------------------------------------------------------------------------"
         echo "$testing"
@@ -141,7 +141,7 @@ status_check_mirrors() {
     echo "Checking status of all mirrors from $mirrorsURL"
     # perl -0777 makes <> whole doco as single string; -ne wraps code in while loop
     # $1 = name | $2 = overallStatus | $3 = url
-    statusCheck=$(curl -sS "$mirrorsURL" | perl -0777 -ne 'while(/name:"([^"]+)",overallStatus:"(error|partial)",url:"([^"]+)"/g){ print "$2\t\t$3\n" }')
+    statusCheck=$(curl -sS "$mirrorsURL" | perl -0777 -ne 'while(/name:"([^"]+)",overallStatus:"(error|partial)",url:"([^"]+)"/g){ print "$2\t\t$1\n" }')
     if [ -n "${statusCheck-}" ]; then
         echo "_STATUS__________MIRROR____________________________________________________________________________"
         echo "$statusCheck"
