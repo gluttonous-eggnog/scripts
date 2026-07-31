@@ -132,19 +132,16 @@ create_backups() {
     fi
 }
 
-# FUNCTION: status_check_mirrors()
-# check the status of the CachyOS mirrors and output out-of-sync
-status_check_mirrors() {
-    local mirrorsURL statusCheck
+# FUNCTION: check_cachyosmirrors_check()
+# Check the CachyOS mirrors API for partial or error status
+check_cachyosmirrors_check(){
+    local mirrorsAPI jsonExtract
 
-    mirrorsURL="https://packages.cachyos.org/mirrors"
-    echo "Checking status of all mirrors from $mirrorsURL"
-    # perl -0777 makes <> whole doco as single string; -ne wraps code in while loop
-    # $1 = name | $2 = overallStatus | $3 = url
-    statusCheck=$(curl -sS "$mirrorsURL" | perl -0777 -ne 'while(/name:"([^"]+)",overallStatus:"(error|partial)",url:"([^"]+)"/g){ print "$2\t\t$1\n" }')
-    if [ -n "${statusCheck-}" ]; then
-        echo "_STATUS__________MIRROR____________________________________________________________________________"
-        echo "$statusCheck"
+    mirrorsAPI="https://packages.cachyos.org/api/v1/mirrors"
+    echo "Checking CachyOS mirrors..."
+    jsonExtract=$(curl -s "$mirrorsAPI" | jq -r '.mirrors[] | select(.overall_status == "error" or .overall_status == "partial") | [.overall_status, .url] | @tsv')
+    if [ -n "${jsonExtract-}" ]; then
+        echo "$jsonExtract"
     else
         echo "All mirrors look healthy."
     fi
@@ -159,14 +156,14 @@ main() {
     do_upgraded_packages=false
     do_installed_packages=false
     do_print_todays=false
-    do_mirror_check=false
+    do_cachy_mirror_check=false
 
     # Parse options
     while getopts ":cbmpsu" opt; do
         case $opt in
             c) do_checkupdate=true ;;
             b) do_backups=true ;;
-            m) do_mirror_check=true ;;
+            m) do_cachy_mirror_check=true ;;
             p) do_print_todays=true ;;
             s) do_installed_packages=true ;;
             u) do_upgraded_packages=true ;;
@@ -179,10 +176,10 @@ main() {
     $do_installed_packages && sync_all_packages
     $do_upgraded_packages && update_the_csv
     $do_print_todays && print_todays_updates
-    $do_mirror_check && status_check_mirrors
+    $do_cachy_mirror_check && check_cachyosmirrors_check
 
     # If no flags provided, show usage
-    if ! $do_backups && ! $do_checkupdate && ! $do_installed_packages && ! $do_upgraded_packages && ! $do_print_todays && ! $do_mirror_check; then
+    if ! $do_backups && ! $do_checkupdate && ! $do_installed_packages && ! $do_upgraded_packages && ! $do_print_todays && ! $$do_cachy_mirror_check; then
         echo "Usage: $0 [-c] [-b] [-m] [-s] [-u]"
         echo " -c   Check for updates"
         echo " -b   Backup current cached pkgs"
