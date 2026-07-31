@@ -133,15 +133,24 @@ create_backups() {
 }
 
 # FUNCTION: check_cachyosmirrors_check()
-# Check the CachyOS mirrors API for partial or error status
+# Check the CachyOS mirrors API for partial or error status against the top 10 mirror list in system
 check_cachyosmirrors_check(){
-    local mirrorsAPI jsonExtract
+    local mirrorsAPI toptenlist jsonExtract
 
     mirrorsAPI="https://packages.cachyos.org/api/v1/mirrors"
-    echo "Checking CachyOS mirrors..."
-    jsonExtract=$(curl -s "$mirrorsAPI" | jq -r '.mirrors[] | select(.overall_status == "error" or .overall_status == "partial") | [.overall_status, .url] | @tsv')
+    jsonExtract=$(curl -s "$mirrorsAPI" | jq -r '.mirrors[] | select(.overall_status == "error" or .overall_status == "partial") | .url')
     if [ -n "${jsonExtract-}" ]; then
-        echo "$jsonExtract"
+        echo "Checking CachyOS mirrors..."
+        toptenlist=$(grep -m10 '^Server' /etc/pacman.d/cachyos-mirrorlist | awk -F' = ' '{print $2}')
+        while IFS= read -r url; do
+            baseURL=$(echo "$url" | sed 's|\(.*cachyos/repo/\).*|\1|')
+
+            if echo "$jsonExtract" | grep -Fq "$baseURL"; then
+                printf "UNHEALTHY:\t%s\n" $baseURL
+            else
+                printf "HEALTHY:\t%s\n" $baseURL
+            fi
+        done <<< "$toptenlist"
     else
         echo "All mirrors look healthy."
     fi
