@@ -67,9 +67,10 @@ update_the_csv() {
 # FUNCTION: sync_all_packages()
 # Update the maintained pacakges csv for newly installed packages
 sync_all_packages() {
+    # Check if PKG_CSV exists
     if [ -f "$PKG_CSV" ]; then
         local temp_file="${PKG_CSV}.tmp"
-        
+
         # Create new CSV with header
         echo "package_name,current_version,prev_version,last_updated" > "$temp_file"
 
@@ -82,7 +83,7 @@ sync_all_packages() {
             else
                 # Assuming package was only ever installed and not updated recently
                 # Get the install date (use 2>/dev/null to suppress error output if not found)
-                install_date=$(date -d "$(stat -c "%y" "/var/lib/pacman/local/${package}"-* 2>/dev/null | sed 's/.*: //')" "+%Y-%m-%d %H:%M:%S")
+                install_date=$(date -d "$(pacman -Qi "$package" 2>/dev/null | grep "Install Date" | sed 's/.*: //')" "+%Y-%m-%d %H:%M:%S")
                 echo "${package},${version},,${install_date}" >> "$temp_file"
             fi
         done
@@ -94,7 +95,7 @@ sync_all_packages() {
     else
         echo "Create $PKG_CSV and add:"
         echo "'package_name,current_version,prev_version,last_updated'"
-        echo "Save file, then re-run this script."
+        echo "Save file, then re-run this script with -s flag"
     fi
 }
 
@@ -135,22 +136,25 @@ create_backups() {
 # FUNCTION: check_cachyosmirrors_check()
 # Check the CachyOS mirrors API for partial or error status against the top 10 mirror list in system
 check_cachyosmirrors_check(){
-    local mirrorsAPI toptenlist jsonExtract
+    local mirrorsAPI systemMirrorsListing jsonExtract
 
     mirrorsAPI="https://packages.cachyos.org/api/v1/mirrors"
     jsonExtract=$(curl -s "$mirrorsAPI" | jq -r '.mirrors[] | select(.overall_status == "error" or .overall_status == "partial") | .url')
+
     if [ -n "${jsonExtract-}" ]; then
         echo "Checking CachyOS mirrors..."
-        toptenlist=$(grep -m10 '^Server' /etc/pacman.d/cachyos-mirrorlist | awk -F' = ' '{print $2}')
-        while IFS= read -r url; do
-            baseURL=$(echo "$url" | sed 's|\(.*cachyos/repo/\).*|\1|')
+        systemMirrorsListing=$(grep -m10 '^Server' /etc/pacman.d/cachyos-mirrorlist | awk -F' = ' '{print $2}')
+        if [ -n "${systemMirrorsListing-}" ]; then
+            while IFS= read -r url; do
+                baseURL=$(echo "$url" | sed 's|\(.*cachyos/repo/\).*|\1|')
 
-            if echo "$jsonExtract" | grep -Fq "$baseURL"; then
-                printf "UNHEALTHY:\t%s\n" $baseURL
-            else
-                printf "HEALTHY:\t%s\n" $baseURL
-            fi
-        done <<< "$toptenlist"
+                if echo "$jsonExtract" | grep -Fq "$baseURL"; then
+                    printf "\e[31mWARNING:\t%s\e[0m\n" $baseURL
+                else
+                    printf "HEALTHY:\t%s\n" $baseURL
+                fi
+            done <<< "$systemMirrorsListing"
+        fi
     else
         echo "All mirrors look healthy."
     fi
