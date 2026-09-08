@@ -5,16 +5,16 @@ sensors_output=$(sensors)
 printf "%s\n" " +------------------------------------------------------------+"
 printf " |=\033[41m AMD Ryzen 9800X3D \033[0m========================================|\n"
 printf " |                                    |    \033[36mMIN\033[0m    |    \033[35mMAX\033[0m    |\n"
-echo "$sensors_output" | awk '
+awk '
     /^CPU:/ {
-        min_value = substr($(NF-3), 1, length($(NF-3)) - 1);
-        max_value = substr($(NF-0), 1, length($(NF-0)) - 1);
-        printf " | CPU:  \t%14s%11s%7s%5s%7s  |\n", $2, " ", min_value, " ", max_value
+        min_value = substr($(NF-3), 2, length($(NF-3)) - 2);
+        max_value = substr($(NF-0), 2, length($(NF-0)) - 2);
+        printf "││ CPU:  \t%14s%11s%7s%5s%7s  ││\n", substr($2, 2), " ", min_value, " ", max_value
     }
-    /^(Tctl:|Tccd1)/ { printf " | %s\t%14s%32s|\n", $1, $2, " " }'
+    /^(Tctl:|Tccd1)/ { printf " | %s\t%14s%32s|\n", $1, $2, " " }' <<< "$sensors_output"
 printf "%s\n" " +------------------------------------------------------------+"
 printf " |= \e[31mPowerColor Reaper AMD Radeon RX 9070\e[0m =====================|\n"
-echo "$sensors_output" | awk '
+awk '
     /^vddgfx:/ {
         printf " | GPU Core (VDDGFX):%7s %-2s%31s|\n", $2, $3, " "
     }
@@ -22,13 +22,13 @@ echo "$sensors_output" | awk '
         printf " | Fan RPM:%17s RPM%30s|\n", $2, " "
     }
     /^edge:/{
-        printf " | GPU Temp:%18s%32s|\n", $2, " "
+        printf "││ GPU Temp:%18s%32s││\n", substr($2, 2), " "
     }
     /^junction:/ {
-        printf " | GPU Hot Spot:%14s%32s|\n", $2, " "
+        printf "││ GPU Hot Spot:%14s%32s││\n", substr($2, 2), " "
     }
     /^mem:/ {
-        printf " | Memory Temp:%15s%32s|\n", $2, " "
+        printf "││ Memory Temp:%15s%32s││\n", substr($2, 2), " "
     }
     /^PPT:/ {
         printf " | PPT:%21s %-2s%31s|\n", $2, $3, " "
@@ -38,21 +38,21 @@ echo "$sensors_output" | awk '
     }
     /^mclk:/ {
         printf " | MEM Clock:%15s %-3s%30s|\n", $2, $3, " "
-    }'
+    }' <<< "$sensors_output"
 printf "%s\n" " +------------------------------------------------------------+"
 printf " |= \033[33mG.Skill FlareX5 32Gb [2x16Gb] DDR5 6000 MHz\033[0m ==============|\n"
-echo "$sensors_output" | awk '/^DIMM/ {
-    printf " | DIMM A/B Temp:%13s%32s|\n", $2, " "
-}'
+awk '/^DIMM/ {
+    printf " | DIMM A/B Temp:%13s%32s|\n", substr($2, 2), " "
+}' <<< "$sensors_output"
 printf "%s\n" " +------------------------------------------------------------+"
 printf " |= \033[33mCrucial T500 1Tb [M.2 PCIe Gen4]\033[0m =========================|\n"
-echo "$sensors_output" | awk '/^NVMe/ {
-    printf " | NVMe Temp:%17s%32s|\n", $3, " "
-}'
+awk '/^NVMe/ {
+    printf " | NVMe Temp:%17s%32s|\n", substr($3, 2), " "
+}' <<< "$sensors_output"
 printf "%s\n" " +------------------------------------------------------------+"
 printf " |= \033[33mASRock PG-B650E-ITX\033[0m ======================================|\n"
 printf " |                                    |    \033[36mMIN\033[0m    |    \033[35mMAX\033[0m    |\n"
-echo "$sensors_output" | awk '
+awk '
     /^Vcore:/ {
         printf " | %s\t%12s %-2s%8s%7s V   %7s V  |\n", $1, $2, $3, " ", $(NF-5), $(NF-1)
     }
@@ -66,8 +66,8 @@ echo "$sensors_output" | awk '
         printf " | Water Pump:\t%12s RPM%10s%-5s\t%5s%5s    |\n", $3, "", $(NF-5), " ", $(NF-1)
     }
     index($0, "M/B:") || index($0, "VRM:") {
-        min_value = substr($(NF-3), 1, length($(NF-3)) - 1);
-        max_value = substr($(NF-0), 1, length($(NF-0)) - 1);
-        printf " | %s\t%22s%11s%7s%5s%7s  |\n", $1, $2, " ", min_value, " ", max_value
-    }'
+        min_value = substr($(NF-3), 2, length($(NF-3)) - 2);
+        max_value = substr($(NF-0), 2, length($(NF-0)) - 2);
+        printf " | %s\t%22s%11s%7s%5s%7s  |\n", $1, substr($2, 2), " ", min_value, " ", max_value
+    }' <<< "$sensors_output"
 printf "%s\n" " +------------------------------------------------------------+"
