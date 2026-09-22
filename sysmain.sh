@@ -7,14 +7,11 @@ PKG_CSV="$HOME/Documents/pacmanpkgs.csv"
 # Check for updates and additionally see if any affect GPU
 check_for_updates() {
     echo "Checking for updates..."
+    local listavailableupdates="$(checkupdates)"
 
-    local count=$(checkupdates | wc -l)
-
-    if [ "$count" -ne 0 ]; then
-        local gpu_detect
-
-        echo "Updates available: $count"
-        gpu_detect="$(checkupdates | awk '/cachyos|proton|nvidia|amd|wine|xorg|wayland|archlinux|faugus|steam|vulkan|firmware|drm/ {print $1, $4}')"
+    if [ -n "${listavailableupdates-}" ]; then
+        echo "Updates available: $(wc -l <<< "$listavailableupdates")"
+        local gpu_detect="$(checkupdates | awk '/cachyos|proton|nvidia|amd|wine|xorg|wayland|archlinux|faugus|steam|vulkan|firmware|drm/ {print $1, $4}')"
         if [ -n "${gpu_detect-}" ]; then
             echo "!!! FOUND THESE PACKAGES !!!"
             echo "$gpu_detect"
@@ -27,41 +24,47 @@ check_for_updates() {
 # FUNCTION: update_the_csv()
 # Update the maintained package csv
 update_the_csv() {
-    local currentdate testing package version_info old_version new_version timestamp
-
+    local currentdate testing temp_file
     currentdate="$(date +"%Y-%m-%d")"
+    temp_file="${PKG_CSV}.tmp"
 
-    # Extract today's upgrades from pacman.log
-    # example output: [2026-04-22T15:40:17+1000] proton-cachyos-slr (1:10.0.20260408-1 -> 1:10.0.20260409-1)
-    #                 $1                         $2                 $3                 $4 $5
-    testing=$(awk "/$currentdate.*upgraded/{print \$1, \$4, \$5, \$6, \$7}" /var/log/pacman.log)
+    # 1. Extract today's upgrades into a temporary format: package,new_version,old_version,timestamp
+    # Use gsub to clean brackets and parentheses directly in awk
+    testing=$(awk -v d="$currentdate" '
+        $0 ~ d ".*upgraded" {
+            ts = $1; gsub(/[\[\]]/, "", ts);
+            pkg = $2;
+            old_v = $3; gsub(/\(/, "", old_v);
+            new_v = $5; gsub(/\)/, "", new_v);
+            print pkg "," new_v "," old_v "," ts
+        }' /var/log/pacman.log)
 
     if [ -n "${testing-}" ]; then
+        # 2. Update the CSV in ONE pass
+        # Pass the extracted updates as a variable and use an associative array to track them
+        awk -v updates_str="$testing" '
+            BEGIN {
+                FS = ","; OFS = ",";
+                # Split the updates string into an array indexed by package name
+                n = split(updates_str, lines, "\n");
+                for (i = 1; i <= n; i++) {
+                    split(lines[i], parts, ",");
+                    update_data[parts[1]] = lines[i];
+                }
+            }
+            {
+                # If the first column (package) is in our update list, replace the whole line
+                if ($1 in update_data) {
+                    $0 = update_data[$1];
+                }
+                print $0
+            }' "$PKG_CSV" > "$temp_file" && mv "$temp_file" "$PKG_CSV"
 
-        # Process each upgraded package from today
-        while IFS= read -r log_line; do
-            # Extract timestamp (remove brackets) and convert to local time
-            local raw_timestamp=$(echo "$log_line" | awk '{print $1}' | tr -d '[]')
-            timestamp=$(date -d "$raw_timestamp" +"%Y-%m-%d %H:%M:%S")
-
-            # Extract package name
-            package=$(echo "$log_line" | awk '{print $2}')
-
-            # Extract versions from "(old -> new)" format
-            old_version=$(echo "$log_line" | awk '{print $3}' | tr -d '(')
-            new_version=$(echo "$log_line" | awk '{print $5}' | tr -d ')')
-
-            # Process the CSV file
-            awk -v pkg="$package" -v new_v="$new_version" -v old_v="$old_version" -v ts="$timestamp" \
-              '$0 ~ "^" pkg "," { $0 = pkg "," new_v "," old_v "," ts } 1' "$PKG_CSV" > "$PKG_CSV.tmp" && \
-              mv "$PKG_CSV.tmp" "$PKG_CSV"
-        done <<< "$testing"
-
-        echo "$PKG_CSV updated with todays upgrades."
-        echo "to view, use 'cat Documents/pacmanpkgs.csv | column -s, -t | less'"
+        echo "Updated $PKG_CSV."
     else
-        echo "Nothing was updated today."
+        echo "Nothing was upgraded today."
     fi
+    echo "To view, use 'column -s, -t $PKG_CSV | less'"
 }
 
 # FUNCTION: sync_all_packages()
@@ -133,9 +136,9 @@ create_backups() {
     fi
 }
 
-# FUNCTION: check_cachyosmirrors_check()
-# Check the CachyOS mirrors API for partial or error status against the top 10 mirror list in system
-check_cachyosmirrors_check(){
+# FUNCTION: check_cachyosmirrors()
+# Check the CachyOS mirrors API for partial or error status against top 10 mirror list in system
+check_cachyosmirrors(){
     local mirrorsAPI systemMirrorsListing jsonExtract
 
     mirrorsAPI="https://packages.cachyos.org/api/v1/mirrors"
@@ -160,6 +163,17 @@ check_cachyosmirrors_check(){
     fi
 }
 
+# FUNCTION: print_usage()
+# Print a list of accepted cmd line arguement options
+print_usage(){
+    echo "Usage: $0 [-c] [-b] [-m] [-s] [-u]"
+    echo " -c   Check for updates"
+    echo " -b   Backup current cached pkgs"
+    echo " -m   Check status of CachyOS mirrors"
+    echo " -p   Print a list of upgraded packages from today"
+    echo " -s   Sync the CSV file for newly installed"
+    echo " -u   Update the maintained system package list CSV file"
+}
 
 # MAIN
 # script starts here:
@@ -189,18 +203,11 @@ main() {
     $do_installed_packages && sync_all_packages
     $do_upgraded_packages && update_the_csv
     $do_print_todays && print_todays_updates
-    $do_cachy_mirror_check && check_cachyosmirrors_check
+    $do_cachy_mirror_check && check_cachyosmirrors
 
     # If no flags provided, show usage
     if ! $do_backups && ! $do_checkupdate && ! $do_installed_packages && ! $do_upgraded_packages && ! $do_print_todays && ! $$do_cachy_mirror_check; then
-        echo "Usage: $0 [-c] [-b] [-m] [-s] [-u]"
-        echo " -c   Check for updates"
-        echo " -b   Backup current cached pkgs"
-        echo " -m   Check status of CachyOS mirrors"
-        echo " -p   Print a list of upgraded packages from today"
-        echo " -s   Sync the CSV file for newly installed"
-        echo " -u   Update the maintained system package list CSV file"
-
+        print_usage
     fi
 }
 main "$@"
