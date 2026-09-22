@@ -11,7 +11,7 @@ check_for_updates() {
 
     if [ -n "${listavailableupdates-}" ]; then
         echo "Updates available: $(wc -l <<< "$listavailableupdates")"
-        local gpu_detect="$(checkupdates | awk '/cachyos|proton|nvidia|amd|wine|xorg|wayland|archlinux|faugus|steam|vulkan|firmware|drm/ {print $1, $4}')"
+        local gpu_detect="$(awk '/cachyos|proton|nvidia|amd|wine|xorg|wayland|archlinux|faugus|steam|vulkan|firmware|drm/ {print $1, $4}' <<< "$listavailableupdates" )"
         if [ -n "${gpu_detect-}" ]; then
             echo "!!! FOUND THESE PACKAGES !!!"
             echo "$gpu_detect"
