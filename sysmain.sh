@@ -27,13 +27,11 @@ update_the_csv() {
     local currentdate testing package version_info old_version new_version timestamp
 
     currentdate="$(date +"%Y-%m-%d")"
-    # currentdate="2026-04-22"
-
     # Extract today's upgrades from pacman.log
-    testing=$(awk "/$currentdate.*upgraded/{print \$1, \$4, \$5, \$6, \$7}" /var/log/pacman.log)
+    testing=$(awk "/$currentdate.*upgraded/{match(\$0, /\(([^ ]+) -> ([^ ]+)\)/, arr); print \$4, arr[2], arr[1], \$1}" /var/log/pacman.log)
     # example output:
-    # [2026-04-22T15:40:17+1000] proton-cachyos-slr (1:10.0.20260408-1 -> 1:10.0.20260409-1)
-    #       $1                         $2                 $3           $4      $5
+    # linux-cachyos 7.2.7-1 7.2.6-1 [2026-09-24T10:12:03+1000]
+    #       $1        $2       $3              $4
 
     if [ -n "${testing-}" ]; then
         # Create a copy of CSV file
@@ -42,15 +40,9 @@ update_the_csv() {
         # Process each upgraded package from today
         while IFS= read -r log_line; do
             # Extract all fields at once
-            read -r raw_timestamp package version_info <<< "$(awk '{print $1, $2, $3, $4, $5}' <<< "$log_line")"
-            # Clean up timestamp and convert to local time format
+            read -r package new_version old_version raw_timestamp <<< "$log_line"
+            # Remove [] from timestamp and convert to local time format
             timestamp=$(date -d "${raw_timestamp//[\[\]]/}" +"%Y-%m-%d %H:%M:%S")
-
-            # Extract versions from "(old -> new)" format
-            old_version="${version_info%% ->*}"     # Remove " -> ..." from the right
-            old_version="${old_version#(}"          # Remove "(" from the left
-            new_version="${version_info##*-> }"     # Remove everything up to and including "-> "
-            new_version="${new_version%)}"          # Remove ")" from the right
 
             # Process the CSV file
             awk -v pkg="$package" -v new_v="$new_version" -v old_v="$old_version" -v ts="$timestamp" \
@@ -64,7 +56,6 @@ update_the_csv() {
         echo "Nothing was upgraded today."
     fi
     echo "To view, use 'column -s, -t _pacmanpkgs.csv | less'"
-
 }
 
 # FUNCTION: sync_all_packages()
@@ -113,12 +104,10 @@ print_todays_updates() {
         echo "$testing"
         echo "─────────────────────────────────────────────────────────────────────────────────────────────────────────"
     fi
-
     explicit=$(pacman -Qqe | wc -l)
     nativenondep=$(pacman -Qqent | wc -l)
-    diff=$(( explicit - nativenondep ))
     echo "$(pacman -Qq | wc -l) packages installed"
-    printf "%4s packages explicitly installed (of which %s are dependencies)\n" $explicit $diff
+    printf "%4s packages explicitly installed (%s are independent)\n" $explicit $nativenondep
 }
 
 # FUNCTION: create_backups()
