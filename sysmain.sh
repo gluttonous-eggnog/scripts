@@ -13,58 +13,58 @@ check_for_updates() {
         echo "Updates available: $(wc -l <<< "$listavailableupdates")"
         local gpu_detect="$(awk '/cachyos|proton|nvidia|amd|wine|xorg|wayland|archlinux|faugus|steam|vulkan|firmware|drm/ {print $1, $4}' <<< "$listavailableupdates" )"
         if [ -n "${gpu_detect-}" ]; then
-            echo "!!! FOUND THESE PACKAGES !!!"
+            printf "\e[31m─── THESE UPDATES INCLUDE THE FOLLOWING ───\e[0m\n"
             echo "$gpu_detect"
         fi
     else
-        echo "No new packages. You're up-to-date!"
+        echo "No new packages. System is up to date!"
     fi
 }
 
 # FUNCTION: update_the_csv()
 # Update the maintained package csv
 update_the_csv() {
-    local currentdate testing temp_file
-    currentdate="$(date +"%Y-%m-%d")"
-    temp_file="${PKG_CSV}.tmp"
+    local currentdate testing package version_info old_version new_version timestamp
 
-    # 1. Extract today's upgrades into a temporary format: package,new_version,old_version,timestamp
-    # Use gsub to clean brackets and parentheses directly in awk
-    testing=$(awk -v d="$currentdate" '
-        $0 ~ d ".*upgraded" {
-            ts = $1; gsub(/[\[\]]/, "", ts);
-            pkg = $2;
-            old_v = $3; gsub(/\(/, "", old_v);
-            new_v = $5; gsub(/\)/, "", new_v);
-            print pkg "," new_v "," old_v "," ts
-        }' /var/log/pacman.log)
+    currentdate="$(date +"%Y-%m-%d")"
+    # currentdate="2026-04-22"
+
+    # Extract today's upgrades from pacman.log
+    testing=$(awk "/$currentdate.*upgraded/{print \$1, \$4, \$5, \$6, \$7}" /var/log/pacman.log)
+    # example output:
+    # [2026-04-22T15:40:17+1000] proton-cachyos-slr (1:10.0.20260408-1 -> 1:10.0.20260409-1)
+    #       $1                         $2                 $3           $4      $5
 
     if [ -n "${testing-}" ]; then
-        # 2. Update the CSV in ONE pass
-        # Pass the extracted updates as a variable and use an associative array to track them
-        awk -v updates_str="$testing" '
-            BEGIN {
-                FS = ","; OFS = ",";
-                # Split the updates string into an array indexed by package name
-                n = split(updates_str, lines, "\n");
-                for (i = 1; i <= n; i++) {
-                    split(lines[i], parts, ",");
-                    update_data[parts[1]] = lines[i];
-                }
-            }
-            {
-                # If the first column (package) is in our update list, replace the whole line
-                if ($1 in update_data) {
-                    $0 = update_data[$1];
-                }
-                print $0
-            }' "$PKG_CSV" > "$temp_file" && mv "$temp_file" "$PKG_CSV"
+        # Create a copy of CSV file
+        temp_file="${PKG_CSV}.tmp"
+
+        # Process each upgraded package from today
+        while IFS= read -r log_line; do
+            # Extract all fields at once
+            read -r raw_timestamp package version_info <<< "$(awk '{print $1, $2, $3, $4, $5}' <<< "$log_line")"
+            # Clean up timestamp and convert to local time format
+            timestamp=$(date -d "${raw_timestamp//[\[\]]/}" +"%Y-%m-%d %H:%M:%S")
+
+            # Extract versions from "(old -> new)" format
+            old_version="${version_info%% ->*}"     # Remove " -> ..." from the right
+            old_version="${old_version#(}"          # Remove "(" from the left
+            new_version="${version_info##*-> }"     # Remove everything up to and including "-> "
+            new_version="${new_version%)}"          # Remove ")" from the right
+
+            # Process the CSV file
+            awk -v pkg="$package" -v new_v="$new_version" -v old_v="$old_version" -v ts="$timestamp" \
+              '$0 ~ "^" pkg "," { $0 = pkg "," new_v "," old_v "," ts } 1' "$PKG_CSV" > "$temp_file" && \
+              mv "$temp_file" "$PKG_CSV"
+
+        done <<< "$testing"
 
         echo "Updated $PKG_CSV."
     else
         echo "Nothing was upgraded today."
     fi
-    echo "To view, use 'column -s, -t $PKG_CSV | less'"
+    echo "To view, use 'column -s, -t _pacmanpkgs.csv | less'"
+
 }
 
 # FUNCTION: sync_all_packages()
@@ -109,9 +109,9 @@ print_todays_updates() {
 
     testing=$( (grep "$(date +"%Y-%m-%d")" $PKG_CSV | column -s, -t) || true )
     if [ -n "${testing-}" ]; then
-        echo "----------------------------------------------------------------------------------------------------------------"
+        echo "─────────────────────────────────────────────────────────────────────────────────────────────────────────"
         echo "$testing"
-        echo "----------------------------------------------------------------------------------------------------------------"
+        echo "─────────────────────────────────────────────────────────────────────────────────────────────────────────"
     fi
 
     explicit=$(pacman -Qqe | wc -l)
