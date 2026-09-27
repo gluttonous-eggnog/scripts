@@ -52,10 +52,15 @@ update_the_csv() {
         done <<< "$testing"
 
         echo "Updated $PKG_CSV."
+        # Check if configs need to manually merged
+        testing=$(awk "/$currentdate.*pacnew/ {print substr(\$0, index(\$0, \$3))}" /var/log/pacman.log)
+        if [ -n "${testing-}" ]; then
+            printf "\e[31m%s\e[0m\n" "$testing"
+        fi
     else
         echo "Nothing was upgraded today."
     fi
-    echo "To view, use 'column -s, -t _pacmanpkgs.csv | less'"
+#    echo "To view, use 'column -s, -t _pacmanpkgs.csv | less'"
 }
 
 # FUNCTION: sync_all_packages()
