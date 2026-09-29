@@ -44,10 +44,10 @@ awk '
         nvme_temp = sprintf("││ NVMe Temperature %12s%30s││", substr($3, 2), " ")
     }
     /^Vcore:/ {
-        corev = sprintf("││ %s\t%14s %-2s%6s%7s V   %7s V  ││", $1, $2, $3, " ", substr($(NF-5), 2), substr($(NF-1), 2))
+        corev = sprintf("││ %s\t%14s %-2s%6s%7s V   %7s V  ││", substr($1, 1, length($1)-1), $2, $3, " ", substr($(NF-5), 2), substr($(NF-1), 2))
     }
     index($0, "5.0V") || index($0, "12.0V") || index($0, "VDDCR") || index($0, "VDD_") || index($0,  "3.3V") || index($0, "DRAM") {
-        voltages[NR] = sprintf("││ %s\t%14s %-2s%7s%6s V %9s V  ││", $1, $2, $3, " ", substr($(NF-5), 2), substr($(NF-1), 2))
+        voltages[NR] = sprintf("││ %s \t%14s %-2s%7s%6s V %9s V  ││", substr($1, 1, length($1)-1), $2, $3, " ", substr($(NF-5), 2), substr($(NF-1), 2))
     }
     index($0, "M/B:") {
         min_value = substr($(NF-3), 2, length($(NF-3)) - 2);
@@ -70,7 +70,7 @@ awk '
     }
     END {
         printf "┌──────────────────────────────────────────────────────────────┐\n"
-        printf "│┌─\033[41m AMD Ryzen 9800X3D \033[0m────────────────┬───────────┬───────────┐│\n"
+        printf "│┌─\033[41m AMD Ryzen 7 7800X3D \033[0m──────────────┬───────────┬───────────┐│\n"
         printf "││                                    │    \033[36mMIN\033[0m    │    \033[35mMAX\033[0m    ││\n"
         print cpudie
         print cputctl
@@ -107,4 +107,5 @@ awk '
         print vrm_temp
         printf "│└────────────────────────────────────────────────────────────┘│\n"
         printf "└──────────────────────────────────────────────────────────────┘\n"
-    }' <<< "$sensors_output"
+    }
+' <<< "$sensors_output"
