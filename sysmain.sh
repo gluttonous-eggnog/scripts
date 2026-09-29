@@ -52,11 +52,6 @@ update_the_csv() {
         done <<< "$testing"
 
         echo "Updated $PKG_CSV."
-        # Check if configs need to manually merged
-        testing=$(awk "/$currentdate.*pacnew/ {print substr(\$0, index(\$0, \$3))}" /var/log/pacman.log)
-        if [ -n "${testing-}" ]; then
-            printf "\e[31m%s\e[0m\n" "$testing"
-        fi
     else
         echo "Nothing was upgraded today."
     fi
@@ -98,6 +93,16 @@ sync_all_packages() {
     fi
 }
 
+# FUNCTION: check_new_config_clash()
+# print a list of config files that have changed and require manual intervention
+check_new_config_clash() {
+    mapfile -t pacfiles < <(pacdiff -o)
+    if ((${#pacfiles[@]})); then
+        printf '\n(%d) \e[31mConfiguration file(s) requiring attention:\e[0m\n' "${#pacfiles[@]}"
+        printf '  %s\n' "${pacfiles[@]}"
+    fi
+}
+
 # FUNCTION: print_todays_updates()
 # print a list of pkgs updated today (today's current date)
 print_todays_updates() {
@@ -113,6 +118,7 @@ print_todays_updates() {
     nativenondep=$(pacman -Qqent | wc -l)
     echo "$(pacman -Qq | wc -l) packages installed"
     printf "%4s packages explicitly installed (%s are independent)\n" $explicit $nativenondep
+    check_new_config_clash
 }
 
 # FUNCTION: create_backups()
