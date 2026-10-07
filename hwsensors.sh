@@ -20,10 +20,10 @@ awk '
         gpuhs = sprintf("││ GPU Hot Spot %16s%30s││", substr($2, 2), " ")
     }
     /^mem:/ {
-        gpumem = sprintf("││ GPU Memory Temp %13s%30s││", substr($2, 2), " ")
+        gpumem = sprintf("││ GPU MEM Temperature %9s%30s││", substr($2, 2), " ")
     }
     /^sclk:/ {
-        gpuclk = sprintf("││ GPU FCLK %18s %-3s%28s││", $2, $3, " ")
+        gpuclk = sprintf("││ GPU Core Clock %12s %-3s%28s││", $2, $3, " ")
     }
     /^mclk:/ {
         gpumclk = sprintf("││ GPU Memory Clock %10s %-3s%28s││", $2, $3, " ")
@@ -35,7 +35,7 @@ awk '
         gpupower = sprintf("││ GPU Power (PPT) %11s %-2s%29s││", $2, $3, " ")
     }
     /^fan1:/ {
-        gpufan = sprintf("││ Fan Speed %17s RPM%28s││", $2, " ")
+        gpufan = sprintf("││ GPU Fan Speed %13s RPM%28s││", $2, " ")
     }
     /^DIMM/ {
         ddr_mem = sprintf("││ DIMM A/B Temperature %8s%30s││", substr($2, 2), " ")
