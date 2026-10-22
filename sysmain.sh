@@ -11,10 +11,10 @@ check_for_updates() {
 
     if [ -n "${listavailableupdates-}" ]; then
         echo "Updates available: $(wc -l <<< "$listavailableupdates")"
-        local gpu_detect="$(awk '/cachyos|proton|nvidia|amd|wine|xorg|wayland|archlinux|faugus|steam|vulkan|firmware|drm/ {print $1, $4}' <<< "$listavailableupdates" )"
-        if [ -n "${gpu_detect-}" ]; then
+        local important_pkgs="$(awk '/cachyos|proton|nvidia|amd|wine|xorg|wayland|archlinux|faugus|steam|vulkan|firmware|drm/ {print $1, $4}' <<< "$listavailableupdates" )"
+        if [ -n "${important_pkgs-}" ]; then
             printf "\e[31m─── THESE UPDATES INCLUDE THE FOLLOWING ───\e[0m\n"
-            echo "$gpu_detect"
+            echo "$important_pkgs"
         fi
     else
         echo "No new packages. System is up to date!"
