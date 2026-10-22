@@ -144,7 +144,7 @@ check_cachyosmirrors() {
     mirrorsAPI="https://packages.cachyos.org/api/v1/mirrors"
     jsonExtract=$(curl -s "$mirrorsAPI" | jq -r '.mirrors[] | .overall_status + "\t\t" + .url')
     if [ -n "${jsonExtract}" ]; then
-        systemMirrorsListing=$(grep -m10 '^Server' /etc/pacman.d/cachyos-mirrorlist | awk -F' = ' '{print $2}' | sed 's|\(.*cachyos/repo/\).*|\1|')
+        systemMirrorsListing=$(grep -m10 '^Server' /etc/pacman.d/cachyos-mirrorlist | awk -F' = ' '{print $2}' | sed 's|/repo/.*|/repo/|')
         grep -F -f <(echo "$systemMirrorsListing") <(echo "$jsonExtract")
     else
         echo "\e[31mERROR:\e[0m Unable to extract or parse json."
