@@ -138,28 +138,32 @@ create_backups() {
 
 # FUNCTION: check_cachyosmirrors()
 # Check the CachyOS mirrors API for partial or error status against top 10 mirror list in system
-check_cachyosmirrors(){
+check_cachyosmirrors() {
     local mirrorsAPI systemMirrorsListing jsonExtract
 
     mirrorsAPI="https://packages.cachyos.org/api/v1/mirrors"
-    jsonExtract=$(curl -s "$mirrorsAPI" | jq -r '.mirrors[] | select(.overall_status == "error" or .overall_status == "partial") | .url')
-
-    if [ -n "${jsonExtract-}" ]; then
-        echo "Checking CachyOS mirrors..."
-        systemMirrorsListing=$(grep -m10 '^Server' /etc/pacman.d/cachyos-mirrorlist | awk -F' = ' '{print $2}')
-        if [ -n "${systemMirrorsListing-}" ]; then
-            while IFS= read -r url; do
-                baseURL=$(echo "$url" | sed 's|\(.*cachyos/repo/\).*|\1|')
-
-                if echo "$jsonExtract" | grep -Fq "$baseURL"; then
-                    printf "\e[31mWARNING:\t%s\e[0m\n" $baseURL
-                else
-                    printf "HEALTHY:\t%s\n" $baseURL
-                fi
-            done <<< "$systemMirrorsListing"
-        fi
+    jsonExtract=$(curl -s "$mirrorsAPI" | jq -r '.mirrors[] | .overall_status + "\t\t" + .url')
+    if [ -n "${jsonExtract}" ]; then
+        systemMirrorsListing=$(grep -m10 '^Server' /etc/pacman.d/cachyos-mirrorlist | awk -F' = ' '{print $2}' | sed 's|\(.*cachyos/repo/\).*|\1|')
+        grep -F -f <(echo "$systemMirrorsListing") <(echo "$jsonExtract")
     else
-        echo "All mirrors look healthy."
+        echo "\e[31mERROR:\e[0m Unable to extract or parse json."
+    fi
+}
+
+# FUNCTION: get_detailed_cachyosmirrors()
+# Use the top 5 mirrors and check the last updated timestamp for znver4 repos
+get_detailed_cachyosmirrors() {
+    local mirrorsAPI systemMirrorsListing jsonExtract
+
+    mirrorsAPI="https://packages.cachyos.org/api/v1/mirrors"
+    # only get healthy mirrors
+    jsonExtract=$(curl -s "https://packages.cachyos.org/api/v1/mirrors" | jq -r '.mirrors[] | select(.overall_status == "healthy") | .url as $url | .checks[] | select((.path | contains("-v3") | not) and (.path | contains("-v4") | not)) | $url + .path + "\t\t" + (.last_updated | fromdate | localtime | strftime("%d-%m-%Y %H:%M:%S"))')
+    if [ -n "${jsonExtract-}" ]; then
+        systemMirrorsListing=$(grep -m5 '^Server' /etc/pacman.d/cachyos-mirrorlist | awk -F' = ' '{print $2}' | sed 's|/repo/.*|/repo/|')
+        grep -F -f <(echo "$systemMirrorsListing") <(echo "$jsonExtract")
+    else
+        echo "\e[31mERROR:\e[0m Unable to extract or parse json."
     fi
 }
 
@@ -169,11 +173,13 @@ print_usage(){
     echo "Usage: $0 [-c] [-b] [-m] [-s] [-u]"
     echo " -c   Check for updates"
     echo " -b   Backup current cached pkgs"
-    echo " -m   Check status of CachyOS mirrors"
+    echo " -m   Check CachyOS mirrors for healthy status (use -M instead for last sync of repos)"
     echo " -p   Print a list of upgraded packages from today"
     echo " -s   Sync the CSV file for newly installed"
     echo " -u   Update the maintained system package list CSV file"
+    printf "NOTE: To view the CSV file use\n 'column -s, -t Documents/_pacmanpkgs.csv | less'"
 }
+
 
 # MAIN
 # script starts here:
@@ -184,13 +190,15 @@ main() {
     do_installed_packages=false
     do_print_todays=false
     do_cachy_mirror_check=false
+    do_cachy_mirror_lastupdated=false
 
     # Parse options
-    while getopts ":cbmpsu" opt; do
+    while getopts ":cbmMpsu" opt; do
         case $opt in
             c) do_checkupdate=true ;;
             b) do_backups=true ;;
             m) do_cachy_mirror_check=true ;;
+            M) do_cachy_mirror_lastupdated=true ;;
             p) do_print_todays=true ;;
             s) do_installed_packages=true ;;
             u) do_upgraded_packages=true ;;
@@ -204,9 +212,10 @@ main() {
     $do_upgraded_packages && update_the_csv
     $do_print_todays && print_todays_updates
     $do_cachy_mirror_check && check_cachyosmirrors
+    $do_cachy_mirror_lastupdated && get_detailed_cachyosmirrors
 
     # If no flags provided, show usage
-    if ! $do_backups && ! $do_checkupdate && ! $do_installed_packages && ! $do_upgraded_packages && ! $do_print_todays && ! $$do_cachy_mirror_check; then
+    if ! $do_backups && ! $do_checkupdate && ! $do_installed_packages && ! $do_upgraded_packages && ! $do_print_todays && ! $$do_cachy_mirror_check && ! $do_cachy_mirror_lastupdated; then
         print_usage
     fi
 }
