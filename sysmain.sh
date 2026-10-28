@@ -58,9 +58,9 @@ update_the_csv() {
 #    echo "To view, use 'column -s, -t _pacmanpkgs.csv | less'"
 }
 
-# FUNCTION: sync_all_packages()
+# FUNCTION: sync_all_to_csv()
 # Update the maintained pacakges csv for newly installed packages
-sync_all_packages() {
+sync_all_to_csv() {
     # Check if PKG_CSV exists
     if [ -f "$PKG_CSV" ]; then
         local temp_file="${PKG_CSV}.tmp"
@@ -151,19 +151,31 @@ check_cachyosmirrors() {
     fi
 }
 
-# FUNCTION: get_detailed_cachyosmirrors()
+# FUNCTION: get_lastsync_cachyosmirrors()
 # Use the top 5 mirrors and check the last updated timestamp for znver4 repos
-get_detailed_cachyosmirrors() {
+get_lastsync_cachyosmirrors() {
     local mirrorsAPI systemMirrorsListing jsonExtract
 
     mirrorsAPI="https://packages.cachyos.org/api/v1/mirrors"
     # only get healthy mirrors
-    jsonExtract=$(curl -s "https://packages.cachyos.org/api/v1/mirrors" | jq -r '.mirrors[] | select(.overall_status == "healthy") | .url as $url | .checks[] | select((.path | contains("-v3") | not) and (.path | contains("-v4") | not)) | $url + .path + "\t\t" + (.last_updated | fromdate | localtime | strftime("%d-%m-%Y %H:%M:%S"))')
+    jsonExtract=$(curl -s "$mirrorsAPI" |
+        jq -r '
+        .mirrors[]
+        | select(.overall_status == "healthy")
+        | . as $mirror
+        | [$mirror.checks[]
+            | select((.path | contains("-v3") or contains("-v4")) | not)
+            | " \t\(.last_updated | fromdate | localtime | strftime("%d-%m-%Y %H:%M:%S"))\t\(.path)"
+            ] as $lines
+        | select($lines | length > 0)
+        | "\($mirror.url)\n\($lines | join("\n"))"
+        '
+    )
     if [ -n "${jsonExtract-}" ]; then
         systemMirrorsListing=$(grep -m5 '^Server' /etc/pacman.d/cachyos-mirrorlist | awk -F' = ' '{print $2}' | sed 's|/repo/.*|/repo/|')
-        grep -F -f <(echo "$systemMirrorsListing") <(echo "$jsonExtract")
+        grep -F -A 4 -f <(echo "$systemMirrorsListing") <(echo "$jsonExtract")
     else
-        echo "\e[31mERROR:\e[0m Unable to extract or parse json."
+        printf "\e[31mERROR:\e[0m Unable to extract or parse json.\n"
     fi
 }
 
@@ -208,11 +220,11 @@ main() {
 
     # Execute requested options
     $do_checkupdate && check_for_updates
-    $do_installed_packages && sync_all_packages
+    $do_installed_packages && sync_all_to_csv
     $do_upgraded_packages && update_the_csv
     $do_print_todays && print_todays_updates
     $do_cachy_mirror_check && check_cachyosmirrors
-    $do_cachy_mirror_lastupdated && get_detailed_cachyosmirrors
+    $do_cachy_mirror_lastupdated && get_lastsync_cachyosmirrors
 
     # If no flags provided, show usage
     if ! $do_backups && ! $do_checkupdate && ! $do_installed_packages && ! $do_upgraded_packages && ! $do_print_todays && ! $$do_cachy_mirror_check && ! $do_cachy_mirror_lastupdated; then
